@@ -1,392 +1,153 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
 
-local _G_GhostyRunning = true
+local function CreatePlayerEsp(player)
+    if player == LocalPlayer then return end
 
-if CoreGui:FindFirstChild("GhostyMenu") then CoreGui.GhostyMenu:Destroy() end
-if Lighting:FindFirstChild("GhostyBlur") then Lighting.GhostyBlur:Destroy() end
+    local function applyVisuals(char)
+        if char:FindFirstChild("GhostyEspTag") then char.GhostyEspTag:Destroy() end
+        
+        local root = char:WaitForChild("HumanoidRootPart", 5)
+        local humanoid = char:WaitForChild("Humanoid", 5)
+        if not root or not humanoid then return end
 
-local GhostyMenu = Instance.new("ScreenGui")
-GhostyMenu.Name = "GhostyMenu"
-GhostyMenu.Parent = CoreGui
-GhostyMenu.ResetOnSpawn = false
-GhostyMenu.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        -- Папка-контейнер внутри персонажа, чтобы легко чистить
+        local folder = Instance.new("Folder")
+        folder.Name = "GhostyEspTag"
+        folder.Parent = char
 
-local Blur = Instance.new("BlurEffect")
-Blur.Name = "GhostyBlur"
-Blur.Size = 14
-Blur.Enabled = true
-Blur.Parent = Lighting
+        -- Текстовый блок (Ники и Дистанция)
+        local bGui = Instance.new("BillboardGui", folder)
+        bGui.AlwaysOnTop = true
+        bGui.Size = UDim2.new(0, 200, 0, 50)
+        bGui.ExtentsOffset = Vector3.new(0, 3, 0)
+        
+        local nameLabel = Instance.new("TextLabel", bGui)
+        nameLabel.Size = UDim2.new(1, 0, 0, 20)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = player.Name
+        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameLabel.TextStrokeTransparency = 0
+        nameLabel.TextSize = 13
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.Visible = false
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 780, 0, 520)
-MainFrame.Position = UDim2.new(0.5, -390, 0.5, -260)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = GhostyMenu
+        local distLabel = Instance.new("TextLabel", bGui)
+        distLabel.Size = UDim2.new(1, 0, 0, 20)
+        distLabel.Position = UDim2.new(0, 0, 0, 20)
+        distLabel.BackgroundTransparency = 1
+        distLabel.TextColor3 = Color3.fromRGB(45, 140, 255)
+        distLabel.TextStrokeTransparency = 0
+        distLabel.TextSize = 12
+        distLabel.Font = Enum.Font.GothamMedium
+        distLabel.Visible = false
 
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-local MainStroke = Instance.new("UIStroke", MainFrame)
-MainStroke.Color = Color3.fromRGB(35, 35, 42)
+        -- 3D Бокс (Adornment)
+        local box3D = Instance.new("BoxHandleAdornment", folder)
+        box3D.Size = Vector3.new(4, 5.5, 4)
+        box3D.AlwaysOnTop = true
+        box3D.ZIndex = 5
+        box3D.Transparency = 0.5
+        box3D.Visible = false
 
--- Сайдбар
-local LeftPanel = Instance.new("Frame", MainFrame)
-LeftPanel.Size = UDim2.new(0, 180, 1, 0)
-LeftPanel.BackgroundColor3 = Color3.fromRGB(11, 11, 13)
-LeftPanel.BorderSizePixel = 0
-Instance.new("UICorner", LeftPanel).CornerRadius = UDim.new(0, 10)
+        -- 2D Бокс на основе интерфейса (Прямоугольник)
+        local bGui2D = Instance.new("BillboardGui", folder)
+        bGui2D.AlwaysOnTop = true
+        bGui2D.Size = UDim2.new(0, 4.5, 0, 6)
+        
+        local stroke2D = Instance.new("UIStroke", Instance.new("Frame", bGui2D))
+        stroke2D.Parent.Size = UDim2.new(1, 0, 1, 0)
+        stroke2D.Parent.BackgroundTransparency = 1
+        stroke2D.Color = Color3.fromRGB(255, 255, 255)
+        stroke2D.Thickness = 1.5
+        bGui2D.Enabled = false
 
-local LeftHide = Instance.new("Frame", LeftPanel)
-LeftHide.Size = UDim2.new(0, 20, 1, 0)
-LeftHide.Position = UDim2.new(1, -20, 0, 0)
-LeftHide.BackgroundColor3 = Color3.fromRGB(11, 11, 13)
-LeftHide.BorderSizePixel = 0
+        -- Полоска здоровья (Health Bar)
+        local healthFrame = Instance.new("Frame", bGui2D.Frame)
+        healthFrame.Size = UDim2.new(0, 3, 1, 0)
+        healthFrame.Position = UDim2.new(0, -8, 0, 0)
+        healthFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        healthFrame.BorderSizePixel = 0
+        healthFrame.Visible = false
 
-local Logo = Instance.new("TextLabel", LeftPanel)
-Logo.Size = UDim2.new(1, 0, 0, 60)
-Logo.BackgroundTransparency = 1
-Logo.Text = "GHOSTY"
-Logo.TextColor3 = Color3.fromRGB(45, 140, 255)
-Logo.TextSize = 22
-Logo.Font = Enum.Font.GothamBold
+        -- Цикл постоянного обновления
+        local connection
+        connection = game:GetService("RunService").RenderStepped:Connect(function()
+            if not folder or not folder.Parent or not _G.GhostyConfig then
+                connection:Disconnect()
+                return
+            end
 
-local TabContainer = Instance.new("Frame", LeftPanel)
-TabContainer.Position = UDim2.new(0, 15, 0, 75)
-TabContainer.Size = UDim2.new(1, -30, 1, -90)
-TabContainer.BackgroundTransparency = 1
+            local active = _G.GhostyConfig.EspEnabled and humanoid.Health > 0
+            if active then
+                bGui.Adornee = root
+                bGui2D.Adornee = root
+                box3D.Adornee = root
 
-local TabLayout = Instance.new("UIListLayout", TabContainer)
-TabLayout.Padding = UDim.new(0, 8)
-TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                -- Чекбокс никнеймов
+                nameLabel.Visible = _G.GhostyConfig.EspNames
+                
+                -- Чекбокс Дистанции (Работает отдельно)
+                if _G.GhostyConfig.EspDistance and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = math.round((root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude)
+                    distLabel.Text = dist .. "m"
+                    distLabel.Visible = true
+                    -- Если ник скрыт, поднимаем дистанцию выше
+                    distLabel.Position = _G.GhostyConfig.EspNames and UDim2.new(0,0,0,20) or UDim2.new(0,0,0,0)
+                else
+                    distLabel.Visible = false
+                end
 
--- Контентная зона
-local Content = Instance.new("Frame", MainFrame)
-Content.Position = UDim2.new(0, 195, 0, 20)
-Content.Size = UDim2.new(1, -215, 1, -40)
-Content.BackgroundTransparency = 1
+                -- Чекбокс 3D Боксов
+                if _G.GhostyConfig.EspBoxes3D then
+                    box3D.Visible = true
+                    box3D.Color3 = _G.GhostyConfig.BoxColor
+                    if _G.GhostyConfig.FillEnabled then
+                        box3D.Transparency = _G.GhostyConfig.FillTransparency
+                    else
+                        box3D.Transparency = 1 -- Оставляем невидимым если заливка выключена
+                    end
+                else
+                    box3D.Visible = false
+                end
 
-local Pages = {}
-local categories = {"AIM", "RENDER", "MISC", "CONFIG"}
+                -- Чекбокс 2D Боксов
+                if _G.GhostyConfig.EspBoxes2D and not _G.GhostyConfig.EspBoxes3D then
+                    bGui2D.Enabled = true
+                    stroke2D.Color = _G.GhostyConfig.BoxColor
+                    if _G.GhostyConfig.FillEnabled then
+                        stroke2D.Parent.BackgroundTransparency = _G.GhostyConfig.FillTransparency
+                        stroke2D.Parent.BackgroundColor3 = _G.GhostyConfig.FillColor
+                    else
+                        stroke2D.Parent.BackgroundTransparency = 1
+                    end
+                else
+                    bGui2D.Enabled = false
+                end
 
-_G.GhostyConfig = {
-    EspEnabled = false,
-    EspBoxes2D = false,
-    EspBoxes3D = false,
-    EspLines = false,
-    EspNames = false,
-    EspHealth = false,
-    EspDistance = false,
-    NoTextures = false,
-    BoxColor = Color3.fromRGB(255, 255, 255),
-    FillColor = Color3.fromRGB(45, 140, 255),
-    BoxTransparency = 0,
-    FillTransparency = 0.6,
-    FillEnabled = false,
-    
-    ChamsEnabled = false,
-    ChamsFillColor = Color3.fromRGB(45, 140, 255),
-    ChamsOutlineColor = Color3.fromRGB(255, 255, 255),
-    ChamsFillTransparency = 0.5,
-    ChamsOutlineTransparency = 0,
-    ChamsVisibleOnly = false
-}
-
-_G.GhostyBinds = {} 
-local KeybindSignals = {}
-
-for _, catName in ipairs(categories) do
-    local Page = Instance.new("ScrollingFrame", Content)
-    Page.Name = catName.."_Page"
-    Page.Size = UDim2.new(1, 0, 1, 0)
-    Page.BackgroundTransparency = 1
-    Page.Visible = (catName == "AIM")
-    Page.ScrollBarThickness = 2
-    Page.ScrollBarImageColor3 = Color3.fromRGB(45, 140, 255)
-    Page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    
-    local pageLayout = Instance.new("UIListLayout", Page)
-    pageLayout.Padding = UDim.new(0, 15)
-    Pages[catName] = Page
-end
-
-local function CreateSubCategory(parent, title)
-    local Section = Instance.new("Frame", parent)
-    Section.Size = UDim2.new(1, -5, 0, 40)
-    Section.AutomaticSize = Enum.AutomaticSize.Y
-    Section.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    Instance.new("UICorner", Section).CornerRadius = UDim.new(0, 6)
-    Instance.new("UIStroke", Section).Color = Color3.fromRGB(28, 28, 35)
-    
-    local SecTitle = Instance.new("TextLabel", Section)
-    SecTitle.Size = UDim2.new(1, -15, 0, 30)
-    SecTitle.Position = UDim2.new(0, 15, 0, 5)
-    SecTitle.BackgroundTransparency = 1
-    SecTitle.Text = title:upper()
-    SecTitle.TextColor3 = Color3.fromRGB(45, 140, 255)
-    SecTitle.TextSize = 11
-    SecTitle.Font = Enum.Font.GothamBold
-    SecTitle.TextXAlignment = Enum.TextXAlignment.Left
-    
-    local Container = Instance.new("Frame", Section)
-    Container.Position = UDim2.new(0, 15, 0, 35)
-    Container.Size = UDim2.new(1, -30, 0, 5)
-    Container.AutomaticSize = Enum.AutomaticSize.Y
-    Container.BackgroundTransparency = 1
-    
-    local containerLayout = Instance.new("UIListLayout", Container)
-    containerLayout.Padding = UDim.new(0, 6)
-    
-    return Container
-end
-
--- Переключатель (Toggle) с поддержкой Кейбиндов
-local function CreateToggle(parent, text, configKey, callback)
-    local ToggleFrame = Instance.new("Frame", parent)
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 30)
-    ToggleFrame.BackgroundTransparency = 1
-    
-    local Btn = Instance.new("TextButton", ToggleFrame)
-    Btn.Size = UDim2.new(1, -60, 1, 0)
-    Btn.BackgroundTransparency = 1
-    Btn.Text = ""
-    
-    local Box = Instance.new("Frame", Btn)
-    Box.Size = UDim2.new(0, 16, 0, 16)
-    Box.Position = UDim2.new(0, 0, 0.5, -8)
-    Box.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
-    Box.BorderSizePixel = 0
-    Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 4)
-    
-    local Label = Instance.new("TextLabel", Btn)
-    Label.Position = UDim2.new(0, 26, 0, 0)
-    Label.Size = UDim2.new(1, -30, 1, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = text
-    Label.TextColor3 = Color3.fromRGB(170, 170, 175)
-    Label.TextSize = 13
-    Label.Font = Enum.Font.GothamMedium
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    
-    local BindBtn = Instance.new("TextButton", ToggleFrame)
-    BindBtn.Size = UDim2.new(0, 50, 0, 20)
-    BindBtn.Position = UDim2.new(1, -50, 0.5, -10)
-    BindBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
-    BindBtn.Text = "[...]"
-    BindBtn.TextColor3 = Color3.fromRGB(120, 120, 125)
-    BindBtn.TextSize = 11
-    BindBtn.Font = Enum.Font.GothamMedium
-    Instance.new("UICorner", BindBtn).CornerRadius = UDim.new(0, 4)
-    
-    local function setVisualState(state)
-        TweenService:Create(Box, TweenInfo.new(0.12), {BackgroundColor3 = state and Color3.fromRGB(45, 140, 255) or Color3.fromRGB(28, 28, 35)}):Play()
-        TweenService:Create(Label, TweenInfo.new(0.12), {TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 170, 175)}):Play()
-    end
-    
-    local function trigger()
-        _G.GhostyConfig[configKey] = not _G.GhostyConfig[configKey]
-        setVisualState(_G.GhostyConfig[configKey])
-        if callback then callback(_G.GhostyConfig[configKey]) end
-    end
-    
-    Btn.MouseButton1Click:Connect(trigger)
-    KeybindSignals[configKey] = trigger
-    
-    local listening = false
-    BindBtn.MouseButton1Click:Connect(function()
-        listening = true
-        BindBtn.Text = "???"
-        BindBtn.TextColor3 = Color3.fromRGB(45, 140, 255)
-    end)
-    
-    UserInputService.InputBegan:Connect(function(input, proc)
-        if proc then return end
-        if listening and input.UserInputType == Enum.UserInputType.Keyboard then
-            listening = false
-            if input.KeyCode == Enum.KeyCode.Escape then
-                _G.GhostyBinds[configKey] = nil
-                BindBtn.Text = "[...]"
-                BindBtn.TextColor3 = Color3.fromRGB(120, 120, 125)
+                -- Чекбокс здоровья
+                if _G.GhostyConfig.EspHealth and _G.GhostyConfig.EspBoxes2D then
+                    local hpPercent = humanoid.Health / humanoid.MaxHealth
+                    healthFrame.Size = UDim2.new(0, 3, hpPercent, 0)
+                    healthFrame.Position = UDim2.new(0, -8, 1 - hpPercent, 0)
+                    healthFrame.BackgroundColor3 = Color3.fromRGB(255 * (1 - hpPercent), 255 * hpPercent, 0)
+                    healthFrame.Visible = true
+                else
+                    healthFrame.Visible = false
+                end
             else
-                _G.GhostyBinds[configKey] = input.KeyCode.Name
-                BindBtn.Text = "[" .. input.KeyCode.Name .. "]"
-                BindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                nameLabel.Visible = false
+                distLabel.Visible = false
+                box3D.Visible = false
+                bGui2D.Enabled = false
             end
-        end
-    end)
-    
-    return ToggleFrame
+        end)
+    end
+
+    if player.Character then applyVisuals(player.Character) end
+    player.CharacterAdded:Connect(applyVisuals)
 end
 
-local function CreateSlider(parent, text, min, max, default, configKey, decimals)
-    local SliderFrame = Instance.new("Frame", parent)
-    SliderFrame.Size = UDim2.new(1, 0, 0, 45)
-    SliderFrame.BackgroundTransparency = 1
-    
-    local Label = Instance.new("TextLabel", SliderFrame)
-    Label.Size = UDim2.new(1, 0, 0, 20)
-    Label.BackgroundTransparency = 1
-    Label.Text = text .. ": " .. tostring(default)
-    Label.TextColor3 = Color3.fromRGB(170, 170, 175)
-    Label.TextSize = 12
-    Label.Font = Enum.Font.GothamMedium
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    
-    local Track = Instance.new("TextButton", SliderFrame)
-    Track.Position = UDim2.new(0, 0, 0, 24)
-    Track.Size = UDim2.new(1, 0, 0, 6)
-    Track.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
-    Track.Text = ""
-    Instance.new("UICorner", Track).CornerRadius = UDim.new(0, 3)
-    
-    local Fill = Instance.new("Frame", Track)
-    Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    Fill.BackgroundColor3 = Color3.fromRGB(45, 140, 255)
-    Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 3)
-    
-    local function update(input)
-        local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
-        local val = min + (max - min) * pos
-        if decimals then val = math.round(val * 10) / 10 else val = math.round(val) end
-        _G.GhostyConfig[configKey] = val
-        Label.Text = text .. ": " .. tostring(val)
-        Fill.Size = UDim2.new(pos, 0, 1, 0)
-    end
-    
-    local sliding = false
-    Track.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = true update(input) end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then update(input) end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
-    end)
-    
-    return SliderFrame
-end
-
--- =======================================================
--- НАСТРОЙКИ ВКЛАДКИ RENDER (ЕСП СВЕРХУ, ДИНАМИЧЕСКИЙ ПОКАЗ)
--- =======================================================
-local EspSub = CreateSubCategory(Pages["RENDER"], "ESP Settings")
-
-local EspSettingsContainer = Instance.new("Frame", EspSub)
-EspSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
-EspSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
-EspSettingsContainer.BackgroundTransparency = 1
-EspSettingsContainer.Visible = false
-local espSettingsLayout = Instance.new("UIListLayout", EspSettingsContainer)
-espSettingsLayout.Padding = UDim.new(0, 6)
-
--- Главная кнопка наверху
-CreateToggle(EspSub, "ESP Enabled", "EspEnabled", function(state) EspSettingsContainer.Visible = state end)
-
--- Все настройки скрываются под неё
-CreateToggle(EspSettingsContainer, "2D Boxes (Плоские боксы)", "EspBoxes2D")
-CreateToggle(EspSettingsContainer, "3D Boxes (Объемные боксы)", "EspBoxes3D")
-CreateToggle(EspSettingsContainer, "Fill Box (Заливка внутренностей)", "FillEnabled")
-CreateToggle(EspSettingsContainer, "Snap Lines (Линии до игроков)", "EspLines")
-CreateToggle(EspSettingsContainer, "Show Names (Никнеймы)", "EspNames")
-CreateToggle(EspSettingsContainer, "Health Bar (Здоровье)", "EspHealth")
-CreateToggle(EspSettingsContainer, "Distance (Дистанция отдельно)", "EspDistance")
-
-local ChamsSub = CreateSubCategory(Pages["RENDER"], "Chams Settings")
-local ChamsSettingsContainer = Instance.new("Frame", ChamsSub)
-ChamsSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
-ChamsSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
-ChamsSettingsContainer.BackgroundTransparency = 1
-ChamsSettingsContainer.Visible = false
-local chamsSettingsLayout = Instance.new("UIListLayout", ChamsSettingsContainer)
-chamsSettingsLayout.Padding = UDim.new(0, 6)
-
-CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled", function(state) ChamsSettingsContainer.Visible = state end)
-CreateToggle(ChamsSettingsContainer, "Visible Only", "ChamsVisibleOnly")
-
-local WorldSub = CreateSubCategory(Pages["RENDER"], "World Settings")
-CreateToggle(WorldSub, "No Textures (Удалить текстуры карты)", "NoTextures")
-
--- Смена вкладок
-local activeTab = "AIM"
-local tabButtons = {}
-
-local function SwitchTab(target)
-    activeTab = target
-    for name, page in pairs(Pages) do page.Visible = (name == target) end
-    for name, btn in pairs(tabButtons) do
-        local act = (name == target)
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = act and Color3.fromRGB(24, 24, 30) or Color3.fromRGB(11, 11, 13), TextColor3 = act and Color3.fromRGB(45, 140, 255) or Color3.fromRGB(130, 130, 135)}):Play()
-    end
-end
-
-for id, catName in ipairs(categories) do
-    local Btn = Instance.new("TextButton", TabContainer)
-    Btn.Size = UDim2.new(1, 0, 0, 38)
-    Btn.BackgroundColor3 = (catName == "AIM") and Color3.fromRGB(24, 24, 30) or Color3.fromRGB(11, 11, 13)
-    Btn.BorderSizePixel = 0
-    Btn.Text = "  " .. catName
-    Btn.TextColor3 = (catName == "AIM") and Color3.fromRGB(45, 140, 255) or Color3.fromRGB(130, 130, 135)
-    Btn.TextSize = 13
-    Btn.Font = Enum.Font.GothamMedium
-    Btn.TextXAlignment = Enum.TextXAlignment.Left
-    Btn.LayoutOrder = id
-    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 5)
-    
-    tabButtons[catName] = Btn
-    Btn.MouseButton1Click:Connect(function() SwitchTab(catName) end)
-end
-
--- Перетаскивание меню
-local dragToggle = false
-local dragStart = nil
-local startPos = nil
-
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragToggle = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragToggle = false end end)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-local GlobalKeyConnection
-GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    
-    if input.KeyCode == Enum.KeyCode.Insert then
-        MainFrame.Visible = not MainFrame.Visible
-        Blur.Enabled = MainFrame.Visible
-    elseif input.KeyCode == Enum.KeyCode.F10 then
-        _G_GhostyRunning = false
-        if GlobalKeyConnection then GlobalKeyConnection:Disconnect() end
-        GhostyMenu:Destroy()
-        Blur:Destroy()
-    else
-        for configKey, boundKeyName in pairs(_G.GhostyBinds) do
-            if input.KeyCode.Name == boundKeyName and KeybindSignals[configKey] then
-                KeybindSignals[configKey]()
-            end
-        end
-    end
-end)
-
--- Подгрузка внешних изолированных скриптов
-task.spawn(function()
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/textures.lua"))()
-    end)
-end)
+for _, p in ipairs(Players:GetPlayers()) do CreatePlayerEsp(p) end
+Players.PlayerAdded:Connect(CreatePlayerEsp)

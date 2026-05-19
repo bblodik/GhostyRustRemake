@@ -270,26 +270,28 @@ for id, catName in ipairs(categories) do
 end
 
 -- =======================================================
--- ПЕРЕТАСКИВАНИЕ МЫШКОЙ (ИСПРАВЛЕНО!)
+-- НОВОЕ ИСПРАВЛЕННОЕ ПЕРЕТАСКИВАНИЕ МЫШКОЙ (БЕЗ ОШИБОК)
 -- =======================================================
-local dragging, dragStart, startPos
+local dragToggle = false
+local dragStart = nil
+local startPos = nil
+
 MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragToggle = true
         dragStart = input.Position
         startPos = MainFrame.Position
         
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then 
-                dragging = false 
+            if input.UserInputState == Enum.UserInputState.End then
+                dragToggle = false
             end
         end)
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    -- ИСПРАВЛЕНО: Заменено ошибочное Enum.UserInputType.MouseBehavior на MouseMovement
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
         MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
@@ -311,10 +313,25 @@ KeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- ПОДГРУЗКА ВНЕШНИХ МОДУЛЕЙ
+-- ПОДГРУЗКА ВНЕШНИХ МОДУЛЕЙ (С ОТСЛЕЖИВАНИЕМ ОШИБОК)
 task.spawn(function()
-    pcall(function()
+    print("[GHOSTY] Начинаем загрузку модулей рендера...")
+    
+    local espSuccess, espError = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
+    end)
+    if espSuccess then
+        print("[GHOSTY] Модуль ESP.lua успешно загружен!")
+    else
+        warn("[GHOSTY] Ошибка загрузки ESP.lua: ", espError)
+    end
+
+    local chamsSuccess, chamsError = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
     end)
+    if chamsSuccess then
+        print("[GHOSTY] Модуль chams.lua успешно загружен!")
+    else
+        warn("[GHOSTY] Ошибка загрузки chams.lua: ", chamsError)
+    end
 end)

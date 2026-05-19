@@ -2,9 +2,6 @@ local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
-local Players = game:GetService("Players")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
 
 local _G_GhostyRunning = true
 
@@ -84,9 +81,9 @@ _G.GhostyConfig = {
     EspDistance = false,
     NoTextures = false,
     BoxColor = Color3.fromRGB(255, 255, 255),
-    FillColor = Color3.fromRGB(255, 255, 255),
+    FillColor = Color3.fromRGB(45, 140, 255),
     BoxTransparency = 0,
-    FillTransparency = 0.5,
+    FillTransparency = 0.6,
     FillEnabled = false,
     
     ChamsEnabled = false,
@@ -274,7 +271,7 @@ local function CreateSlider(parent, text, min, max, default, configKey, decimals
 end
 
 -- =======================================================
--- СБОРКА И ДИНАМИЧЕСКОЕ СКРЫТИЕ НАСТРОЕК (RENDER)
+-- НАСТРОЙКИ ВКЛАДКИ RENDER (ЕСП СВЕРХУ, ДИНАМИЧЕСКИЙ ПОКАЗ)
 -- =======================================================
 local EspSub = CreateSubCategory(Pages["RENDER"], "ESP Settings")
 
@@ -286,8 +283,10 @@ EspSettingsContainer.Visible = false
 local espSettingsLayout = Instance.new("UIListLayout", EspSettingsContainer)
 espSettingsLayout.Padding = UDim.new(0, 6)
 
+-- Главная кнопка наверху
 CreateToggle(EspSub, "ESP Enabled", "EspEnabled", function(state) EspSettingsContainer.Visible = state end)
 
+-- Все настройки скрываются под неё
 CreateToggle(EspSettingsContainer, "2D Boxes (Плоские боксы)", "EspBoxes2D")
 CreateToggle(EspSettingsContainer, "3D Boxes (Объемные боксы)", "EspBoxes3D")
 CreateToggle(EspSettingsContainer, "Fill Box (Заливка внутренностей)", "FillEnabled")
@@ -295,11 +294,8 @@ CreateToggle(EspSettingsContainer, "Snap Lines (Линии до игроков)"
 CreateToggle(EspSettingsContainer, "Show Names (Никнеймы)", "EspNames")
 CreateToggle(EspSettingsContainer, "Health Bar (Здоровье)", "EspHealth")
 CreateToggle(EspSettingsContainer, "Distance (Дистанция отдельно)", "EspDistance")
-CreateSlider(EspSettingsContainer, "Box Transparency", 0, 1, 0, "BoxTransparency", true)
-CreateSlider(EspSettingsContainer, "Fill Transparency", 0, 1, 0.5, "FillTransparency", true)
 
 local ChamsSub = CreateSubCategory(Pages["RENDER"], "Chams Settings")
-
 local ChamsSettingsContainer = Instance.new("Frame", ChamsSub)
 ChamsSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
 ChamsSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
@@ -310,7 +306,6 @@ chamsSettingsLayout.Padding = UDim.new(0, 6)
 
 CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled", function(state) ChamsSettingsContainer.Visible = state end)
 CreateToggle(ChamsSettingsContainer, "Visible Only", "ChamsVisibleOnly")
-CreateSlider(ChamsSettingsContainer, "Chams Transparency", 0, 1, 0.5, "ChamsFillTransparency", true)
 
 local WorldSub = CreateSubCategory(Pages["RENDER"], "World Settings")
 CreateToggle(WorldSub, "No Textures (Удалить текстуры карты)", "NoTextures")
@@ -387,92 +382,11 @@ GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, proces
     end
 end)
 
--- =======================================================
--- ЛОГИКА ESP (ВСТРОЕНА И ИСПРАВЛЕНА)
--- =======================================================
-local function create3DLine()
-    local l = Drawing.new("Line")
-    l.Thickness = 1
-    l.Visible = false
-    return l
-end
-
-local function CreateEsp(player)
-    if player == LocalPlayer then return end
-    
-    local Box = Drawing.new("Square")
-    Box.Visible = false
-    Box.Thickness = 1
-    Box.Filled = false
-    
-    local Fill = Drawing.new("Square")
-    Fill.Visible = false
-    Fill.Thickness = 0
-    Fill.Filled = true
-    
-    local Line = Drawing.new("Line")
-    Line.Visible = false
-    Line.Thickness = 1
-    
-    local Name = Drawing.new("Text")
-    Name.Visible = false
-    Name.Size = 13
-    Name.Center = true
-    Name.Outline = true
-    
-    local DistText = Drawing.new("Text")
-    DistText.Visible = false
-    DistText.Size = 11
-    DistText.Center = true
-    DistText.Outline = true
-
-    local Health = Drawing.new("Line")
-    Health.Visible = false
-    Health.Thickness = 2
-    
-    local lines3D = {}
-    for i = 1, 12 do table.insert(lines3D, create3DLine()) end
-
-    local function update3DBox(hrp, size, color)
-        local c = hrp.Position
-        local ext = size / 2
-        
-        local vertices = {
-            Camera:WorldToViewportPoint(c + Vector3.new(-ext.X,  ext.Y, -ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new( ext.X,  ext.Y, -ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new( ext.X, -ext.Y, -ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new(-ext.X, -ext.Y, -ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new(-ext.X,  ext.Y,  ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new( ext.X,  ext.Y,  ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new( ext.X, -ext.Y,  ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new(-ext.X, -ext.Y,  ext.Z))
-        }
-
-        local indices = {
-            {1,2}, {2,3}, {3,4}, {4,1},
-            {5,6}, {6,7}, {7,8}, {8,5},
-            {1,5}, {2,6}, {3,7}, {4,8}
-        }
-
-        for i, edge in ipairs(indices) do
-            local p1 = vertices[edge[1]]
-            local p2 = vertices[edge[2]]
-            local l = lines3D[i]
-            
-            if p1 and p2 and p1.Z > 0 and p2.Z > 0 then
-                l.From = Vector2.new(p1.X, p1.Y)
-                l.To = Vector2.new(p2.X, p2.Y)
-                l.Color = color
-                l.Visible = true
-            else
-                l.Visible = false
-            end
-        end
-    end
-
-    local function hide3D()
-        for _, l in ipairs(lines3D) do l.Visible = false end
-    end
-
-    local Connection
-    Connection = game:GetService("RunService").RenderStepped
+-- Подгрузка внешних изолированных скриптов
+task.spawn(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/textures.lua"))()
+    end)
+end)

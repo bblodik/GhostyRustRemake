@@ -431,7 +431,7 @@ end)
 -- Подгрузка изолированных внешних скриптов с GitHub
 task.spawn(function()
     pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/refs/heads/main/esp.lua"))()
         -- loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
         -- loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/textures.lua"))()
     end)

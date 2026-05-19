@@ -78,7 +78,7 @@ _G.GhostyConfig = {
     EspLines = false,
     EspNames = false,
     EspHealth = false,
-    HealthPosition = "Left", -- По умолчанию слева ("Left" или "Right")
+    HealthPosition = "Left",
     EspDistance = false,
     NoTextures = false,
     BoxColor = Color3.fromRGB(255, 255, 255),
@@ -144,7 +144,7 @@ local function CreateSubCategory(parent, title)
     return Container
 end
 
--- Переключатель (Toggle) с поддержкой Кейбиндов
+-- Переключатель (Toggle)
 local function CreateToggle(parent, text, configKey, callback)
     local ToggleFrame = Instance.new("Frame", parent)
     ToggleFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -222,7 +222,7 @@ local function CreateToggle(parent, text, configKey, callback)
     return ToggleFrame
 end
 
--- Кнопка выбора/переключателя текста (для стороны ХП)
+-- Селектор сторон (Влево/Вправо)
 local function CreateSelector(parent, text, configKey, options)
     local Frame = Instance.new("Frame", parent)
     Frame.Size = UDim2.new(1, 0, 0, 30)
@@ -241,7 +241,7 @@ local function CreateSelector(parent, text, configKey, options)
     Btn.Size = UDim2.new(0, 90, 0, 22)
     Btn.Position = UDim2.new(1, -90, 0.5, -11)
     Btn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
-    Btn.Text = _G.GhostyConfig[configKey]
+    Btn.Text = _G.GhostyConfig[configKey] or options[1]
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.TextSize = 12
     Btn.Font = Enum.Font.GothamBold
@@ -328,14 +328,14 @@ espSettingsLayout.Padding = UDim.new(0, 6)
 -- Главная кнопка активации ESP
 CreateToggle(EspSub, "ESP Enabled", "EspEnabled", function(state) EspSettingsContainer.Visible = state end)
 
--- Все поднастройки скрываются под неё
+-- Все поднастройки внутри контейнера
 CreateToggle(EspSettingsContainer, "2D Boxes (Плоские боксы)", "EspBoxes2D")
 CreateToggle(EspSettingsContainer, "3D Boxes (Объемные боксы)", "EspBoxes3D")
 CreateToggle(EspSettingsContainer, "Fill Box (Заливка боксов)", "FillEnabled")
 CreateToggle(EspSettingsContainer, "Snap Lines (Линии до игроков)", "EspLines")
 CreateToggle(EspSettingsContainer, "Show Names (Никнеймы)", "EspNames")
 CreateToggle(EspSettingsContainer, "Health Bar (Здоровье)", "EspHealth")
-CreateSelector(EspSettingsContainer, "Health Position", "HealthPosition", {"Left", "Right"}) -- Выбор стороны ХП!
+CreateSelector(EspSettingsContainer, "Health Position", "HealthPosition", {"Left", "Right"})
 CreateToggle(EspSettingsContainer, "Distance (Дистанция)", "EspDistance")
 CreateSlider(EspSettingsContainer, "Fill Transparency", 0, 1, 0.6, "FillTransparency", true)
 
@@ -384,7 +384,7 @@ for id, catName in ipairs(categories) do
     Btn.MouseButton1Click:Connect(function() SwitchTab(catName) end)
 end
 
--- Перетаскивание меню
+-- Перетаскивание меню (Исправлена проверка MouseMovement)
 local dragToggle = false
 local dragStart = nil
 local startPos = nil
@@ -409,18 +409,20 @@ local GlobalKeyConnection
 GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     
-    if input.KeyCode == Enum.KeyCode.Insert then
-        MainFrame.Visible = not MainFrame.Visible
-        Blur.Enabled = MainFrame.Visible
-    elseif input.KeyCode == Enum.KeyCode.F10 then
-        _G_GhostyRunning = false
-        if GlobalKeyConnection then GlobalKeyConnection:Disconnect() end
-        GhostyMenu:Destroy()
-        Blur:Destroy()
-    else
-        for configKey, boundKeyName in pairs(_G.GhostyBinds) do
-            if input.KeyCode.Name == boundKeyName and KeybindSignals[configKey] then
-                KeybindSignals[configKey]()
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == Enum.KeyCode.Insert then
+            MainFrame.Visible = not MainFrame.Visible
+            Blur.Enabled = MainFrame.Visible
+        elseif input.KeyCode == Enum.KeyCode.F10 then
+            _G_GhostyRunning = false
+            if GlobalKeyConnection then GlobalKeyConnection:Disconnect() end
+            GhostyMenu:Destroy()
+            Blur:Destroy()
+        else
+            for configKey, boundKeyName in pairs(_G.GhostyBinds) do
+                if input.KeyCode.Name == boundKeyName and KeybindSignals[configKey] then
+                    KeybindSignals[configKey]()
+                end
             end
         end
     end
@@ -430,7 +432,7 @@ end)
 task.spawn(function()
     pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/textures.lua"))()
+        -- loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
+        -- loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/textures.lua"))()
     end)
 end)

@@ -22,8 +22,8 @@ Blur.Parent = Lighting
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 760, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -380, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 780, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -390, 0.5, -260)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = GhostyMenu
@@ -71,7 +71,6 @@ Content.BackgroundTransparency = 1
 local Pages = {}
 local categories = {"AIM", "RENDER", "MISC", "CONFIG"}
 
--- ГЛОБАЛЬНЫЕ НАСТРОЙКИ
 _G.GhostyConfig = {
     EspEnabled = false,
     EspBoxes2D = false,
@@ -80,10 +79,11 @@ _G.GhostyConfig = {
     EspNames = false,
     EspHealth = false,
     EspDistance = false,
+    NoTextures = false,
     BoxColor = Color3.fromRGB(255, 255, 255),
-    FillColor = Color3.fromRGB(255, 255, 255),
+    FillColor = Color3.fromRGB(45, 140, 255),
     BoxTransparency = 0,
-    FillTransparency = 0.5,
+    FillTransparency = 0.6,
     FillEnabled = false,
     
     ChamsEnabled = false,
@@ -93,6 +93,9 @@ _G.GhostyConfig = {
     ChamsOutlineTransparency = 0,
     ChamsVisibleOnly = false
 }
+
+_G.GhostyBinds = {} 
+local KeybindSignals = {}
 
 for _, catName in ipairs(categories) do
     local Page = Instance.new("ScrollingFrame", Content)
@@ -105,11 +108,11 @@ for _, catName in ipairs(categories) do
     Page.CanvasSize = UDim2.new(0, 0, 0, 0)
     Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     
-    Instance.new("UIListLayout", Page).Padding = UDim.new(0, 15)
+    local pageLayout = Instance.new("UIListLayout", Page)
+    pageLayout.Padding = UDim.new(0, 15)
     Pages[catName] = Page
 end
 
--- Функция создания подкатегории (Секции)
 local function CreateSubCategory(parent, title)
     local Section = Instance.new("Frame", parent)
     Section.Size = UDim2.new(1, -5, 0, 40)
@@ -133,26 +136,32 @@ local function CreateSubCategory(parent, title)
     Container.Size = UDim2.new(1, -30, 0, 5)
     Container.AutomaticSize = Enum.AutomaticSize.Y
     Container.BackgroundTransparency = 1
-    Instance.new("UIListLayout", Container).Padding = UDim.new(0, 6)
+    
+    local containerLayout = Instance.new("UIListLayout", Container)
+    containerLayout.Padding = UDim.new(0, 6)
     
     return Container
 end
 
--- Элемент: Переключатель (Toggle)
+-- Переключатель (Toggle) с поддержкой Кейбиндов
 local function CreateToggle(parent, text, configKey, callback)
-    local ToggleFrame = Instance.new("TextButton", parent)
+    local ToggleFrame = Instance.new("Frame", parent)
     ToggleFrame.Size = UDim2.new(1, 0, 0, 30)
     ToggleFrame.BackgroundTransparency = 1
-    ToggleFrame.Text = ""
     
-    local Box = Instance.new("Frame", ToggleFrame)
+    local Btn = Instance.new("TextButton", ToggleFrame)
+    Btn.Size = UDim2.new(1, -60, 1, 0)
+    Btn.BackgroundTransparency = 1
+    Btn.Text = ""
+    
+    local Box = Instance.new("Frame", Btn)
     Box.Size = UDim2.new(0, 16, 0, 16)
     Box.Position = UDim2.new(0, 0, 0.5, -8)
     Box.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
     Box.BorderSizePixel = 0
     Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 4)
     
-    local Label = Instance.new("TextLabel", ToggleFrame)
+    local Label = Instance.new("TextLabel", Btn)
     Label.Position = UDim2.new(0, 26, 0, 0)
     Label.Size = UDim2.new(1, -30, 1, 0)
     Label.BackgroundTransparency = 1
@@ -162,16 +171,56 @@ local function CreateToggle(parent, text, configKey, callback)
     Label.Font = Enum.Font.GothamMedium
     Label.TextXAlignment = Enum.TextXAlignment.Left
     
-    ToggleFrame.MouseButton1Click:Connect(function()
-        _G.GhostyConfig[configKey] = not _G.GhostyConfig[configKey]
-        local state = _G.GhostyConfig[configKey]
+    local BindBtn = Instance.new("TextButton", ToggleFrame)
+    BindBtn.Size = UDim2.new(0, 50, 0, 20)
+    BindBtn.Position = UDim2.new(1, -50, 0.5, -10)
+    BindBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    BindBtn.Text = "[...]"
+    BindBtn.TextColor3 = Color3.fromRGB(120, 120, 125)
+    BindBtn.TextSize = 11
+    BindBtn.Font = Enum.Font.GothamMedium
+    Instance.new("UICorner", BindBtn).CornerRadius = UDim.new(0, 4)
+    
+    local function setVisualState(state)
         TweenService:Create(Box, TweenInfo.new(0.12), {BackgroundColor3 = state and Color3.fromRGB(45, 140, 255) or Color3.fromRGB(28, 28, 35)}):Play()
         TweenService:Create(Label, TweenInfo.new(0.12), {TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 170, 175)}):Play()
-        if callback then callback(state) end
+    end
+    
+    local function trigger()
+        _G.GhostyConfig[configKey] = not _G.GhostyConfig[configKey]
+        setVisualState(_G.GhostyConfig[configKey])
+        if callback then callback(_G.GhostyConfig[configKey]) end
+    end
+    
+    Btn.MouseButton1Click:Connect(trigger)
+    KeybindSignals[configKey] = trigger
+    
+    local listening = false
+    BindBtn.MouseButton1Click:Connect(function()
+        listening = true
+        BindBtn.Text = "???"
+        BindBtn.TextColor3 = Color3.fromRGB(45, 140, 255)
     end)
+    
+    UserInputService.InputBegan:Connect(function(input, proc)
+        if proc then return end
+        if listening and input.UserInputType == Enum.UserInputType.Keyboard then
+            listening = false
+            if input.KeyCode == Enum.KeyCode.Escape then
+                _G.GhostyBinds[configKey] = nil
+                BindBtn.Text = "[...]"
+                BindBtn.TextColor3 = Color3.fromRGB(120, 120, 125)
+            else
+                _G.GhostyBinds[configKey] = input.KeyCode.Name
+                BindBtn.Text = "[" .. input.KeyCode.Name .. "]"
+                BindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+        end
+    end)
+    
+    return ToggleFrame
 end
 
--- Элемент: Ползунок (Slider)
 local function CreateSlider(parent, text, min, max, default, configKey, decimals)
     local SliderFrame = Instance.new("Frame", parent)
     SliderFrame.Size = UDim2.new(1, 0, 0, 45)
@@ -217,29 +266,51 @@ local function CreateSlider(parent, text, min, max, default, configKey, decimals
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
     end)
+    
+    return SliderFrame
 end
 
 -- =======================================================
--- НАПОЛНЕНИЕ ПОДКАТЕГОРИЙ (ПАНЕЛЬ РЕНДЕРА)
+-- НАСТРОЙКИ ВКЛАДКИ RENDER (ЕСП СВЕРХУ, ДИНАМИЧЕСКИЙ ПОКАЗ)
 -- =======================================================
-local EspSub = CreateSubCategory(Pages["RENDER"], "ESP Settings (Настройки отрисовки)")
-CreateToggle(EspSub, "Master Switch (Включить ESP)", "EspEnabled")
-CreateToggle(EspSub, "2D Boxes (Плоские боксы)", "EspBoxes2D")
-CreateToggle(EspSub, "3D Boxes (Объемные боксы)", "EspBoxes3D")
-CreateToggle(EspSub, "Fill Box (Заливка внутренностей)", "FillEnabled")
-CreateToggle(EspSub, "Snap Lines (Линии до игроков)", "EspLines")
-CreateToggle(EspSub, "Show Names (Никнеймы)", "EspNames")
-CreateToggle(EspSub, "Health Bar (Здоровье)", "EspHealth")
-CreateToggle(EspSub, "Distance (Дистанция)", "EspDistance")
-CreateSlider(EspSub, "Box Transparency (Прозрачность рамок)", 0, 1, 0, "BoxTransparency", true)
-CreateSlider(EspSub, "Fill Transparency (Прозрачность заливки)", 0, 1, 0.5, "FillTransparency", true)
+local EspSub = CreateSubCategory(Pages["RENDER"], "ESP Settings")
 
-local ChamsSub = CreateSubCategory(Pages["RENDER"], "Chams Settings (Подсветка моделей)")
-CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled")
-CreateToggle(ChamsSub, "Visible Only (Только за стеной)", "ChamsVisibleOnly")
-CreateSlider(ChamsSub, "Chams Transparency", 0, 1, 0.5, "ChamsFillTransparency", true)
+local EspSettingsContainer = Instance.new("Frame", EspSub)
+EspSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
+EspSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
+EspSettingsContainer.BackgroundTransparency = 1
+EspSettingsContainer.Visible = false
+local espSettingsLayout = Instance.new("UIListLayout", EspSettingsContainer)
+espSettingsLayout.Padding = UDim.new(0, 6)
 
--- Категории переключение
+-- Главная кнопка наверху
+CreateToggle(EspSub, "ESP Enabled", "EspEnabled", function(state) EspSettingsContainer.Visible = state end)
+
+-- Все настройки скрываются под неё
+CreateToggle(EspSettingsContainer, "2D Boxes (Плоские боксы)", "EspBoxes2D")
+CreateToggle(EspSettingsContainer, "3D Boxes (Объемные боксы)", "EspBoxes3D")
+CreateToggle(EspSettingsContainer, "Fill Box (Заливка внутренностей)", "FillEnabled")
+CreateToggle(EspSettingsContainer, "Snap Lines (Линии до игроков)", "EspLines")
+CreateToggle(EspSettingsContainer, "Show Names (Никнеймы)", "EspNames")
+CreateToggle(EspSettingsContainer, "Health Bar (Здоровье)", "EspHealth")
+CreateToggle(EspSettingsContainer, "Distance (Дистанция отдельно)", "EspDistance")
+
+local ChamsSub = CreateSubCategory(Pages["RENDER"], "Chams Settings")
+local ChamsSettingsContainer = Instance.new("Frame", ChamsSub)
+ChamsSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
+ChamsSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
+ChamsSettingsContainer.BackgroundTransparency = 1
+ChamsSettingsContainer.Visible = false
+local chamsSettingsLayout = Instance.new("UIListLayout", ChamsSettingsContainer)
+chamsSettingsLayout.Padding = UDim.new(0, 6)
+
+CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled", function(state) ChamsSettingsContainer.Visible = state end)
+CreateToggle(ChamsSettingsContainer, "Visible Only", "ChamsVisibleOnly")
+
+local WorldSub = CreateSubCategory(Pages["RENDER"], "World Settings")
+CreateToggle(WorldSub, "No Textures (Удалить текстуры карты)", "NoTextures")
+
+-- Смена вкладок
 local activeTab = "AIM"
 local tabButtons = {}
 
@@ -269,9 +340,7 @@ for id, catName in ipairs(categories) do
     Btn.MouseButton1Click:Connect(function() SwitchTab(catName) end)
 end
 
--- =======================================================
--- НОВОЕ ИСПРАВЛЕННОЕ ПЕРЕТАСКИВАНИЕ МЫШКОЙ (БЕЗ ОШИБОК)
--- =======================================================
+-- Перетаскивание меню
 local dragToggle = false
 local dragStart = nil
 local startPos = nil
@@ -281,12 +350,7 @@ MainFrame.InputBegan:Connect(function(input)
         dragToggle = true
         dragStart = input.Position
         startPos = MainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragToggle = false
-            end
-        end)
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragToggle = false end end)
     end
 end)
 
@@ -297,41 +361,32 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Хоткеи
-local KeyConnection
-KeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
+local GlobalKeyConnection
+GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
+    
     if input.KeyCode == Enum.KeyCode.Insert then
         MainFrame.Visible = not MainFrame.Visible
         Blur.Enabled = MainFrame.Visible
     elseif input.KeyCode == Enum.KeyCode.F10 then
         _G_GhostyRunning = false
-        if KeyConnection then KeyConnection:Disconnect() end
+        if GlobalKeyConnection then GlobalKeyConnection:Disconnect() end
         GhostyMenu:Destroy()
         Blur:Destroy()
-        print("[GHOSTY] Читы полностью выгружены.")
+    else
+        for configKey, boundKeyName in pairs(_G.GhostyBinds) do
+            if input.KeyCode.Name == boundKeyName and KeybindSignals[configKey] then
+                KeybindSignals[configKey]()
+            end
+        end
     end
 end)
 
--- ПОДГРУЗКА ВНЕШНИХ МОДУЛЕЙ (С ОТСЛЕЖИВАНИЕМ ОШИБОК)
+-- Подгрузка внешних изолированных скриптов
 task.spawn(function()
-    print("[GHOSTY] Начинаем загрузку модулей рендера...")
-    
-    local espSuccess, espError = pcall(function()
+    pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
-    end)
-    if espSuccess then
-        print("[GHOSTY] Модуль ESP.lua успешно загружен!")
-    else
-        warn("[GHOSTY] Ошибка загрузки ESP.lua: ", espError)
-    end
-
-    local chamsSuccess, chamsError = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/textures.lua"))()
     end)
-    if chamsSuccess then
-        print("[GHOSTY] Модуль chams.lua успешно загружен!")
-    else
-        warn("[GHOSTY] Ошибка загрузки chams.lua: ", chamsError)
-    end
 end)

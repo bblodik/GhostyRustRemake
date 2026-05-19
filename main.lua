@@ -71,7 +71,6 @@ Content.BackgroundTransparency = 1
 local Pages = {}
 local categories = {"AIM", "RENDER", "MISC", "CONFIG"}
 
--- ГЛОБАЛЬНЫЕ НАСТРОЙКИ И БИНДЫ
 _G.GhostyConfig = {
     EspEnabled = false,
     EspBoxes2D = false,
@@ -109,7 +108,6 @@ for _, catName in ipairs(categories) do
     Page.CanvasSize = UDim2.new(0, 0, 0, 0)
     Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     
-    -- ИСПРАВЛЕНО: Заменено Spacing на Padding для полной стабильности UI
     local pageLayout = Instance.new("UIListLayout", Page)
     pageLayout.Padding = UDim.new(0, 15)
     Pages[catName] = Page
@@ -145,7 +143,7 @@ local function CreateSubCategory(parent, title)
     return Container
 end
 
--- Модернизированный Toggle с поддержкой Кейбиндов
+-- Измененный Toggle с поддержкой Кейбиндов
 local function CreateToggle(parent, text, configKey, callback)
     local ToggleFrame = Instance.new("Frame", parent)
     ToggleFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -173,7 +171,6 @@ local function CreateToggle(parent, text, configKey, callback)
     Label.Font = Enum.Font.GothamMedium
     Label.TextXAlignment = Enum.TextXAlignment.Left
     
-    -- Кнопка бинда справа
     local BindBtn = Instance.new("TextButton", ToggleFrame)
     BindBtn.Size = UDim2.new(0, 50, 0, 20)
     BindBtn.Position = UDim2.new(1, -50, 0.5, -10)
@@ -196,9 +193,8 @@ local function CreateToggle(parent, text, configKey, callback)
     end
     
     Btn.MouseButton1Click:Connect(trigger)
-    KeybindSignals[configKey] = trigger -- регистрируем для глобального вызова
+    KeybindSignals[configKey] = trigger
     
-    -- Логика назначения клавиши бинда
     local listening = false
     BindBtn.MouseButton1Click:Connect(function()
         listening = true
@@ -206,7 +202,7 @@ local function CreateToggle(parent, text, configKey, callback)
         BindBtn.TextColor3 = Color3.fromRGB(45, 140, 255)
     end)
     
-    game:GetService("UserInputService").InputBegan:Connect(function(input, proc)
+    UserInputService.InputBegan:Connect(function(input, proc)
         if proc then return end
         if listening and input.UserInputType == Enum.UserInputType.Keyboard then
             listening = false
@@ -221,6 +217,8 @@ local function CreateToggle(parent, text, configKey, callback)
             end
         end
     end)
+    
+    return ToggleFrame
 end
 
 local function CreateSlider(parent, text, min, max, default, configKey, decimals)
@@ -262,70 +260,75 @@ local function CreateSlider(parent, text, min, max, default, configKey, decimals
     Track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = true update(input) end
     end)
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
+    UserInputService.InputChanged:Connect(function(input)
         if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then update(input) end
     end)
-    game:GetService("UserInputService").InputEnded:Connect(function(input)
+    UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
     end)
+    
+    return SliderFrame
 end
 
 -- =======================================================
--- НАПОЛНЕНИЕ ПОДКАТЕГОРИЙ (ПАНЕЛЬ РЕНДЕРА)
+-- СБОРКА И ДИНАМИЧЕСКОЕ СКРЫТИЕ НАСТРОЕК (RENDER)
 -- =======================================================
 local EspSub = CreateSubCategory(Pages["RENDER"], "ESP Settings")
--- ТЗ: ESP Наверху, настройки ниже
-CreateToggle(EspSub, "ESP Enabled", "EspEnabled")
-CreateToggle(EspSub, "2D Boxes (Плоские боксы)", "EspBoxes2D")
-CreateToggle(EspSub, "3D Boxes (Объемные боксы)", "EspBoxes3D")
-CreateToggle(EspSub, "Fill Box (Заливка внутренностей)", "FillEnabled")
-CreateToggle(EspSub, "Snap Lines (Линии до игроков)", "EspLines")
-CreateToggle(EspSub, "Show Names (Никнеймы)", "EspNames")
-CreateToggle(EspSub, "Health Bar (Здоровье)", "EspHealth")
-CreateToggle(EspSub, "Distance (Дистанция отдельно)", "EspDistance") -- ТЗ: Исправлено отображение
-CreateSlider(EspSub, "Box Transparency", 0, 1, 0, "BoxTransparency", true)
-CreateSlider(EspSub, "Fill Transparency", 0, 1, 0.5, "FillTransparency", true)
 
-local WorldSub = CreateSubCategory(Pages["RENDER"], "World Settings")
--- ТЗ: Локальное удаление всех игровых текстур
-local cacheTextures = {}
-CreateToggle(WorldSub, "No Textures (Очистить карту)", "NoTextures", function(state)
-    if state then
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Texture") or obj:IsA("Decal") then
-                cacheTextures[obj] = obj.Parent
-                obj.Parent = nil
-            elseif obj:IsA("MeshPart") then
-                cacheTextures[obj] = obj.TextureID
-                obj.TextureID = ""
-            elseif obj:IsA("BasePart") and not obj:IsA("MeshPart") then
-                cacheTextures[obj] = {obj.Material, obj.Color}
-                obj.Material = Enum.Material.SmoothPlastic
-            end
-        end
-    else
-        for obj, data in pairs(cacheTextures) do
-            pcall(function()
-                if (obj:IsA("Texture") or obj:IsA("Decal")) and data then
-                    obj.Parent = data
-                elseif obj:IsA("MeshPart") then
-                    obj.TextureID = data
-                elseif obj:IsA("BasePart") then
-                    obj.Material = data[1]
-                    obj.Color = data[2]
-                end
-            end)
-        end
-        table.clear(cacheTextures)
-    end
-end)
+-- Создаем скрываемый контейнер для настроек ESP
+local EspSettingsContainer = Instance.new("Frame", EspSub)
+EspSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
+EspSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
+EspSettingsContainer.BackgroundTransparency = 1
+EspSettingsContainer.Visible = false
+local espSettingsLayout = Instance.new("UIListLayout", EspSettingsContainer)
+espSettingsLayout.Padding = UDim.new(0, 6)
+
+-- Функция управления показом настроек ESP
+local function ToggleEspSettings(state)
+    EspSettingsContainer.Visible = state
+end
+
+-- Главная кнопка ESP наверху
+CreateToggle(EspSub, "ESP Enabled", "EspEnabled", ToggleEspSettings)
+
+-- Настройки внутри контейнера (появляются только при включении ESP)
+CreateToggle(EspSettingsContainer, "2D Boxes (Плоские боксы)", "EspBoxes2D")
+CreateToggle(EspSettingsContainer, "3D Boxes (Объемные боксы)", "EspBoxes3D")
+CreateToggle(EspSettingsContainer, "Fill Box (Заливка внутренностей)", "FillEnabled")
+CreateToggle(EspSettingsContainer, "Snap Lines (Линии до игроков)", "EspLines")
+CreateToggle(EspSettingsContainer, "Show Names (Никнеймы)", "EspNames")
+CreateToggle(EspSettingsContainer, "Health Bar (Здоровье)", "EspHealth")
+CreateToggle(EspSettingsContainer, "Distance (Дистанция отдельно)", "EspDistance")
+CreateSlider(EspSettingsContainer, "Box Transparency", 0, 1, 0, "BoxTransparency", true)
+CreateSlider(EspSettingsContainer, "Fill Transparency", 0, 1, 0.5, "FillTransparency", true)
+
 
 local ChamsSub = CreateSubCategory(Pages["RENDER"], "Chams Settings")
-CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled")
-CreateToggle(ChamsSub, "Visible Only", "ChamsVisibleOnly")
-CreateSlider(ChamsSub, "Chams Transparency", 0, 1, 0.5, "ChamsFillTransparency", true)
 
--- Переключение вкладок
+local ChamsSettingsContainer = Instance.new("Frame", ChamsSub)
+ChamsSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
+ChamsSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
+ChamsSettingsContainer.BackgroundTransparency = 1
+ChamsSettingsContainer.Visible = false
+local chamsSettingsLayout = Instance.new("UIListLayout", ChamsSettingsContainer)
+chamsSettingsLayout.Padding = UDim.new(0, 6)
+
+local function ToggleChamsSettings(state)
+    ChamsSettingsContainer.Visible = state
+end
+
+CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled", ToggleChamsSettings)
+CreateToggle(ChamsSettingsContainer, "Visible Only", "ChamsVisibleOnly")
+CreateSlider(ChamsSettingsContainer, "Chams Transparency", 0, 1, 0.5, "ChamsFillTransparency", true)
+
+
+local WorldSub = CreateSubCategory(Pages["RENDER"], "World Settings")
+CreateToggle(WorldSub, "No Textures (Удалить текстуры карты)", "NoTextures")
+
+-- =======================================================
+-- ПЕРЕТАСКИВАНИЕ И СИСТЕМА БИНДОВ
+-- =======================================================
 local activeTab = "AIM"
 local tabButtons = {}
 
@@ -355,7 +358,6 @@ for id, catName in ipairs(categories) do
     Btn.MouseButton1Click:Connect(function() SwitchTab(catName) end)
 end
 
--- Перетаскивание без багов
 local dragToggle = false
 local dragStart = nil
 local startPos = nil
@@ -369,23 +371,20 @@ MainFrame.InputBegan:Connect(function(input)
     end
 end)
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
+UserInputService.InputChanged:Connect(function(input)
     if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
         MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Глобальный обработчик нажатия клавиш (Хоткеи интерфейса + Бинд-система)
 local GlobalKeyConnection
-GlobalKeyConnection = game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     
-    -- Открытие/Закрытие интерфейса
     if input.KeyCode == Enum.KeyCode.Insert then
         MainFrame.Visible = not MainFrame.Visible
         Blur.Enabled = MainFrame.Visible
-    -- Выгрузка чита
     elseif input.KeyCode == Enum.KeyCode.F10 then
         _G_GhostyRunning = false
         if GlobalKeyConnection then GlobalKeyConnection:Disconnect() end
@@ -393,19 +392,18 @@ GlobalKeyConnection = game:GetService("UserInputService").InputBegan:Connect(fun
         Blur:Destroy()
         print("[GHOSTY] Выгружен.")
     else
-        -- Проверка цикличных биндов функций
         for configKey, boundKeyName in pairs(_G.GhostyBinds) do
             if input.KeyCode.Name == boundKeyName and KeybindSignals[configKey] then
-                KeybindSignals[configKey]() -- Меняет состояние и обновляет UI
+                KeybindSignals[configKey]()
             end
         end
     end
 end)
 
--- Подгрузка логики модулей
 task.spawn(function()
     pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/chams.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/textures.lua"))()
     end)
 end)

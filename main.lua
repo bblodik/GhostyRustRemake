@@ -81,9 +81,9 @@ _G.GhostyConfig = {
     EspDistance = false,
     NoTextures = false,
     BoxColor = Color3.fromRGB(255, 255, 255),
-    FillColor = Color3.fromRGB(255, 255, 255),
+    FillColor = Color3.fromRGB(45, 140, 255),
     BoxTransparency = 0,
-    FillTransparency = 0.5,
+    FillTransparency = 0.6,
     FillEnabled = false,
     
     ChamsEnabled = false,
@@ -143,7 +143,7 @@ local function CreateSubCategory(parent, title)
     return Container
 end
 
--- Измененный Toggle с поддержкой Кейбиндов
+-- Переключатель (Toggle) с поддержкой Кейбиндов
 local function CreateToggle(parent, text, configKey, callback)
     local ToggleFrame = Instance.new("Frame", parent)
     ToggleFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -271,11 +271,10 @@ local function CreateSlider(parent, text, min, max, default, configKey, decimals
 end
 
 -- =======================================================
--- СБОРКА И ДИНАМИЧЕСКОЕ СКРЫТИЕ НАСТРОЕК (RENDER)
+-- НАСТРОЙКИ ВКЛАДКИ RENDER (ЕСП СВЕРХУ, ДИНАМИЧЕСКИЙ ПОКАЗ)
 -- =======================================================
 local EspSub = CreateSubCategory(Pages["RENDER"], "ESP Settings")
 
--- Создаем скрываемый контейнер для настроек ESP
 local EspSettingsContainer = Instance.new("Frame", EspSub)
 EspSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
 EspSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
@@ -284,15 +283,10 @@ EspSettingsContainer.Visible = false
 local espSettingsLayout = Instance.new("UIListLayout", EspSettingsContainer)
 espSettingsLayout.Padding = UDim.new(0, 6)
 
--- Функция управления показом настроек ESP
-local function ToggleEspSettings(state)
-    EspSettingsContainer.Visible = state
-end
+-- Главная кнопка наверху
+CreateToggle(EspSub, "ESP Enabled", "EspEnabled", function(state) EspSettingsContainer.Visible = state end)
 
--- Главная кнопка ESP наверху
-CreateToggle(EspSub, "ESP Enabled", "EspEnabled", ToggleEspSettings)
-
--- Настройки внутри контейнера (появляются только при включении ESP)
+-- Все настройки скрываются под неё
 CreateToggle(EspSettingsContainer, "2D Boxes (Плоские боксы)", "EspBoxes2D")
 CreateToggle(EspSettingsContainer, "3D Boxes (Объемные боксы)", "EspBoxes3D")
 CreateToggle(EspSettingsContainer, "Fill Box (Заливка внутренностей)", "FillEnabled")
@@ -300,12 +294,8 @@ CreateToggle(EspSettingsContainer, "Snap Lines (Линии до игроков)"
 CreateToggle(EspSettingsContainer, "Show Names (Никнеймы)", "EspNames")
 CreateToggle(EspSettingsContainer, "Health Bar (Здоровье)", "EspHealth")
 CreateToggle(EspSettingsContainer, "Distance (Дистанция отдельно)", "EspDistance")
-CreateSlider(EspSettingsContainer, "Box Transparency", 0, 1, 0, "BoxTransparency", true)
-CreateSlider(EspSettingsContainer, "Fill Transparency", 0, 1, 0.5, "FillTransparency", true)
-
 
 local ChamsSub = CreateSubCategory(Pages["RENDER"], "Chams Settings")
-
 local ChamsSettingsContainer = Instance.new("Frame", ChamsSub)
 ChamsSettingsContainer.Size = UDim2.new(1, 0, 0, 0)
 ChamsSettingsContainer.AutomaticSize = Enum.AutomaticSize.Y
@@ -314,21 +304,13 @@ ChamsSettingsContainer.Visible = false
 local chamsSettingsLayout = Instance.new("UIListLayout", ChamsSettingsContainer)
 chamsSettingsLayout.Padding = UDim.new(0, 6)
 
-local function ToggleChamsSettings(state)
-    ChamsSettingsContainer.Visible = state
-end
-
-CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled", ToggleChamsSettings)
+CreateToggle(ChamsSub, "Enable Chams", "ChamsEnabled", function(state) ChamsSettingsContainer.Visible = state end)
 CreateToggle(ChamsSettingsContainer, "Visible Only", "ChamsVisibleOnly")
-CreateSlider(ChamsSettingsContainer, "Chams Transparency", 0, 1, 0.5, "ChamsFillTransparency", true)
-
 
 local WorldSub = CreateSubCategory(Pages["RENDER"], "World Settings")
 CreateToggle(WorldSub, "No Textures (Удалить текстуры карты)", "NoTextures")
 
--- =======================================================
--- ПЕРЕТАСКИВАНИЕ И СИСТЕМА БИНДОВ
--- =======================================================
+-- Смена вкладок
 local activeTab = "AIM"
 local tabButtons = {}
 
@@ -358,6 +340,7 @@ for id, catName in ipairs(categories) do
     Btn.MouseButton1Click:Connect(function() SwitchTab(catName) end)
 end
 
+-- Перетаскивание меню
 local dragToggle = false
 local dragStart = nil
 local startPos = nil
@@ -390,7 +373,6 @@ GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, proces
         if GlobalKeyConnection then GlobalKeyConnection:Disconnect() end
         GhostyMenu:Destroy()
         Blur:Destroy()
-        print("[GHOSTY] Выгружен.")
     else
         for configKey, boundKeyName in pairs(_G.GhostyBinds) do
             if input.KeyCode.Name == boundKeyName and KeybindSignals[configKey] then
@@ -400,6 +382,7 @@ GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, proces
     end
 end)
 
+-- Подгрузка внешних изолированных скриптов
 task.spawn(function()
     pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()

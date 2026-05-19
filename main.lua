@@ -78,6 +78,7 @@ _G.GhostyConfig = {
     EspLines = false,
     EspNames = false,
     EspHealth = false,
+    HealthPosition = "Left", -- По умолчанию слева ("Left" или "Right")
     EspDistance = false,
     NoTextures = false,
     BoxColor = Color3.fromRGB(255, 255, 255),
@@ -221,6 +222,47 @@ local function CreateToggle(parent, text, configKey, callback)
     return ToggleFrame
 end
 
+-- Кнопка выбора/переключателя текста (для стороны ХП)
+local function CreateSelector(parent, text, configKey, options)
+    local Frame = Instance.new("Frame", parent)
+    Frame.Size = UDim2.new(1, 0, 0, 30)
+    Frame.BackgroundTransparency = 1
+
+    local Label = Instance.new("TextLabel", Frame)
+    Label.Size = UDim2.new(0, 120, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(170, 170, 175)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.GothamMedium
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local Btn = Instance.new("TextButton", Frame)
+    Btn.Size = UDim2.new(0, 90, 0, 22)
+    Btn.Position = UDim2.new(1, -90, 0.5, -11)
+    Btn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    Btn.Text = _G.GhostyConfig[configKey]
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.TextSize = 12
+    Btn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+
+    local currentIndex = 1
+    for i, v in ipairs(options) do
+        if v == _G.GhostyConfig[configKey] then currentIndex = i break end
+    end
+
+    Btn.MouseButton1Click:Connect(function()
+        currentIndex = currentIndex + 1
+        if currentIndex > #options then currentIndex = 1 end
+        local newSelection = options[currentIndex]
+        _G.GhostyConfig[configKey] = newSelection
+        Btn.Text = newSelection
+    end)
+
+    return Frame
+end
+
 local function CreateSlider(parent, text, min, max, default, configKey, decimals)
     local SliderFrame = Instance.new("Frame", parent)
     SliderFrame.Size = UDim2.new(1, 0, 0, 45)
@@ -271,7 +313,7 @@ local function CreateSlider(parent, text, min, max, default, configKey, decimals
 end
 
 -- =======================================================
--- НАСТРОЙКИ ВКЛАДКИ RENDER (ЕСП СВЕРХУ, ДИНАМИЧЕСКИЙ ПОКАЗ)
+-- НАСТРОЙКИ ВКЛАДКИ RENDER
 -- =======================================================
 local EspSub = CreateSubCategory(Pages["RENDER"], "ESP Settings")
 
@@ -283,17 +325,19 @@ EspSettingsContainer.Visible = false
 local espSettingsLayout = Instance.new("UIListLayout", EspSettingsContainer)
 espSettingsLayout.Padding = UDim.new(0, 6)
 
--- Главная кнопка наверху
+-- Главная кнопка активации ESP
 CreateToggle(EspSub, "ESP Enabled", "EspEnabled", function(state) EspSettingsContainer.Visible = state end)
 
--- Все настройки скрываются под неё
+-- Все поднастройки скрываются под неё
 CreateToggle(EspSettingsContainer, "2D Boxes (Плоские боксы)", "EspBoxes2D")
 CreateToggle(EspSettingsContainer, "3D Boxes (Объемные боксы)", "EspBoxes3D")
-CreateToggle(EspSettingsContainer, "Fill Box (Заливка внутренностей)", "FillEnabled")
+CreateToggle(EspSettingsContainer, "Fill Box (Заливка боксов)", "FillEnabled")
 CreateToggle(EspSettingsContainer, "Snap Lines (Линии до игроков)", "EspLines")
 CreateToggle(EspSettingsContainer, "Show Names (Никнеймы)", "EspNames")
 CreateToggle(EspSettingsContainer, "Health Bar (Здоровье)", "EspHealth")
-CreateToggle(EspSettingsContainer, "Distance (Дистанция отдельно)", "EspDistance")
+CreateSelector(EspSettingsContainer, "Health Position", "HealthPosition", {"Left", "Right"}) -- Выбор стороны ХП!
+CreateToggle(EspSettingsContainer, "Distance (Дистанция)", "EspDistance")
+CreateSlider(EspSettingsContainer, "Fill Transparency", 0, 1, 0.6, "FillTransparency", true)
 
 local ChamsSub = CreateSubCategory(Pages["RENDER"], "Chams Settings")
 local ChamsSettingsContainer = Instance.new("Frame", ChamsSub)
@@ -382,7 +426,7 @@ GlobalKeyConnection = UserInputService.InputBegan:Connect(function(input, proces
     end
 end)
 
--- Подгрузка внешних изолированных скриптов
+-- Подгрузка изолированных внешних скриптов с GitHub
 task.spawn(function()
     pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()

@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Вспомогательная функция для рисования граней 3D куба
 local function create3DLine()
     local l = Drawing.new("Line")
     l.Thickness = 1
@@ -43,7 +42,6 @@ local function CreateEsp(player)
     Health.Visible = false
     Health.Thickness = 2
     
-    -- 12 линий для сборки 3D куба
     local lines3D = {}
     for i = 1, 12 do table.insert(lines3D, create3DLine()) end
 
@@ -51,18 +49,17 @@ local function CreateEsp(player)
         local c = hrp.Position
         local ext = size / 2
         
-        -- Высчитываем 8 вершин куба в пространстве
         local vertices = {
             Camera:WorldToViewportPoint(c + Vector3.new(-ext.X,  ext.Y, -ext.Z)),
             Camera:WorldToViewportPoint(c + Vector3.new( ext.X,  ext.Y, -ext.Z)),
             Camera:WorldToViewportPoint(c + Vector3.new( ext.X, -ext.Y, -ext.Z)),
-            Camera:WorldToViewportPoint(c + Vector3.new(-ext.X, -ext.Y, -ext.Z)),
-            local vertices2 = {
+            Camera:WorldToViewportPoint(c + Vector3.new(-ext.X, -ext.Y, -ext.Z))
+        }
+        local vertices2 = {
             Camera:WorldToViewportPoint(c + Vector3.new(-ext.X,  ext.Y,  ext.Z)),
             Camera:WorldToViewportPoint(c + Vector3.new( ext.X,  ext.Y,  ext.Z)),
             Camera:WorldToViewportPoint(c + Vector3.new( ext.X, -ext.Y,  ext.Z)),
             Camera:WorldToViewportPoint(c + Vector3.new(-ext.X, -ext.Y,  ext.Z))
-            }
         }
         for i, v in ipairs(vertices2) do vertices[i+4] = v end
 
@@ -73,8 +70,8 @@ local function CreateEsp(player)
         }
 
         for i, edge in ipairs(indices) do
-            local p1, onScreen1 = vertices[edge[1]], vertices[edge[1]].Z > 0
-            local p2, onScreen2 = vertices[edge[2]], vertices[edge[2]].Z > 0
+            local p1 = vertices[edge[1]]
+            local p2 = vertices[edge[2]]
             local l = lines3D[i]
             
             if p1 and p2 and p1.Z > 0 and p2.Z > 0 then
@@ -111,13 +108,11 @@ local function CreateEsp(player)
                 local w, h = 3 * scale, 4.5 * scale
                 local x, y = screenPos.X - w / 2, screenPos.Y - h / 2
                 
-                -- Отрисовка 3D куба (размеры подгоняются под хитбокс модели)
                 if _G.GhostyConfig.EspBoxes3D then
                     hide3D()
                     update3DBox(hrp, Vector3.new(4, 6, 4), _G.GhostyConfig.BoxColor)
                     Box.Visible = false
                     Fill.Visible = false
-                -- Отрисовка обычного 2D бокса
                 elseif _G.GhostyConfig.EspBoxes2D then
                     hide3D()
                     Box.Size = Vector2.new(w, h)
@@ -137,7 +132,6 @@ local function CreateEsp(player)
                     hide3D() Box.Visible = false Fill.Visible = false
                 end
                 
-                -- Snap Lines
                 if _G.GhostyConfig.EspLines then
                     Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                     Line.To = Vector2.new(screenPos.X, screenPos.Y + (h/2))
@@ -145,7 +139,6 @@ local function CreateEsp(player)
                     Line.Visible = true
                 else Line.Visible = false end
                 
-                -- Никнеймы (ИСПРАВЛЕНО: Полностью отдельно от дистанции)
                 if _G.GhostyConfig.EspNames then
                     Name.Text = player.Name
                     Name.Position = Vector2.new(screenPos.X, y - 16)
@@ -153,16 +146,13 @@ local function CreateEsp(player)
                     Name.Visible = true
                 else Name.Visible = false end
                 
-                -- Дистанция (ИСПРАВЛЕНО: Полностью независимый блок)
                 if _G.GhostyConfig.EspDistance then
                     DistText.Text = math.round(screenPos.Z) .. "m"
-                    -- Если никнейм включен, опускаем дистанцию под ноги, если выключен — ставим над головой
                     DistText.Position = _G.GhostyConfig.EspNames and Vector2.new(screenPos.X, y + h + 4) or Vector2.new(screenPos.X, y - 14)
                     DistText.Color = Color3.fromRGB(45, 140, 255)
                     DistText.Visible = true
                 else DistText.Visible = false end
                 
-                -- Health Bar
                 if _G.GhostyConfig.EspHealth then
                     local healthPercent = char.Humanoid.Health / char.Humanoid.MaxHealth
                     Health.From = Vector2.new(x - 5, y + h)

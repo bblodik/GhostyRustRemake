@@ -1,13 +1,14 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
 local ESP_Cache = {}
 
--- Функция для создания четкой обводки текста
+-- Функция для создания чёткой обводки текста
 local function НавеситьЧеткийКонтур(label)
     local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 2 -- Сделали еще жирнее для максимальной четкости
+    stroke.Thickness = 1.8
     stroke.Color = Color3.fromRGB(0, 0, 0)
     stroke.JoinMode = Enum.LineJoinMode.Round
     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -18,9 +19,10 @@ local function CreatePlayerEsp(player)
     if player == LocalPlayer then return end
 
     local function applyVisuals(char)
-        -- Если старый контейнер остался — сносим его
-        local oldFolder = char:FindFirstChild("GhostyEspTag")
-        if oldFolder then pcall(function() oldFolder:Destroy() end) end
+        if ESP_Cache[player] then
+            pcall(function() ESP_Cache[player].Folder:Destroy() end)
+            ESP_Cache[player] = nil
+        end
         
         local root = char:WaitForChild("HumanoidRootPart", 5)
         local humanoid = char:WaitForChild("Humanoid", 5)
@@ -30,11 +32,12 @@ local function CreatePlayerEsp(player)
         folder.Name = "GhostyEspTag"
         folder.Parent = char
 
-        -- 1. Ники (сверху головы)
+        -- 1. Ники (BillboardGui сверху головы)
         local bGuiName = Instance.new("BillboardGui", folder)
         bGuiName.AlwaysOnTop = true
         bGuiName.Size = UDim2.new(0, 200, 0, 25)
         bGuiName.ExtentsOffset = Vector3.new(0, 3, 0)
+        bGuiName.Adornee = root
         
         local nameLabel = Instance.new("TextLabel", bGuiName)
         nameLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -46,11 +49,12 @@ local function CreatePlayerEsp(player)
         nameLabel.Visible = false
         НавеситьЧеткийКонтур(nameLabel)
 
-        -- 2. Дистанция (снизу ног)
+        -- 2. Дистанция (BillboardGui снизу ног)
         local bGuiDist = Instance.new("BillboardGui", folder)
         bGuiDist.AlwaysOnTop = true
         bGuiDist.Size = UDim2.new(0, 200, 0, 25)
         bGuiDist.ExtentsOffset = Vector3.new(0, -3.5, 0)
+        bGuiDist.Adornee = root
 
         local distLabel = Instance.new("TextLabel", bGuiDist)
         distLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -66,18 +70,22 @@ local function CreatePlayerEsp(player)
         box3DFill.Size = Vector3.new(4, 5.5, 4)
         box3DFill.AlwaysOnTop = true
         box3DFill.ZIndex = 4
+        box3DFill.Adornee = root
         box3DFill.Visible = false
 
-        -- 4. 3D Бокс без заливки (SelectionBox каркас)
+        -- 4. 3D Бокс без заливки (SelectionBox - дает чистую обводку каркаса)
         local box3DWire = Instance.new("SelectionBox", folder)
+        box3DWire.Adornee = root
         box3DWire.LineThickness = 0.04
         box3DWire.AlwaysOnTop = true
         box3DWire.Visible = false
 
-        -- 5. 2D Бокс (BillboardGui)
+        -- 5. 2D Бокс (BillboardGui каркас)
         local bGui2D = Instance.new("BillboardGui", folder)
         bGui2D.AlwaysOnTop = true
         bGui2D.Size = UDim2.new(0, 4.3, 0, 5.8)
+        bGui2D.Adornee = root
+        bGui2D.Enabled = false
         
         local frame2D = Instance.new("Frame", bGui2D)
         frame2D.Size = UDim2.new(1, 0, 1, 0)
@@ -87,18 +95,21 @@ local function CreatePlayerEsp(player)
         stroke2D.Thickness = 1.8
         stroke2D.Color = Color3.fromRGB(255, 255, 255)
 
-        -- 6. Полоска здоровья
+        -- 6. Полоска здоровья (Health Bar)
         local healthFrame = Instance.new("Frame", frame2D)
+        healthFrame.Size = UDim2.new(0, 3, 1, 0)
+        healthFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
         healthFrame.BorderSizePixel = 0
         healthFrame.Visible = false
         
+        -- Черная подложка (обводка) для ХП бара, чтоб его было видно
         local healthBg = Instance.new("Frame", frame2D)
         healthBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         healthBg.BorderSizePixel = 0
         healthBg.ZIndex = 0
         healthBg.Visible = false
 
-        -- 7. Снап-линии
+        -- 7. Снап-линии (Snap Lines)
         local snapLine = Instance.new("LineHandleAdornment", folder)
         snapLine.Length = 0
         snapLine.Thickness = 1.5
@@ -110,8 +121,6 @@ local function CreatePlayerEsp(player)
             Folder = folder,
             Root = root,
             Humanoid = humanoid,
-            BGuiName = bGuiName,
-            BGuiDist = bGuiDist,
             NameLabel = nameLabel,
             DistLabel = distLabel,
             Box3DFill = box3DFill,
@@ -144,7 +153,9 @@ RunService.RenderStepped:Connect(function()
     local config = _G.GhostyConfig
     if not config then return end
 
+    -- Настройка позиции ХП по умолчанию (если в меню еще нет селектора, будет "Left")
     local hpPosition = config.HealthPosition or "Left"
+
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     local camera = workspace.CurrentCamera
@@ -168,36 +179,27 @@ RunService.RenderStepped:Connect(function()
     local showLines = config.EspLines
 
     for player, data in pairs(ESP_Cache) do
-        -- Если папки или игрока физически нет в мире, дропаем из кэша
-        if not data.Folder or not data.Folder.Parent or not data.Root or not data.Root.Parent then
+        if not data.Folder or not data.Folder.Parent then
             ESP_Cache[player] = nil
             continue
         end
 
         local humanoid = data.Humanoid
-        if espEnabled and humanoid and humanoid.Health > 0 then
+        if espEnabled and humanoid and humanoid.Health > 0 and data.Root then
             
-            -- ЖЕСТКАЯ ПРИВЯЗКА ADORNEE КАЖДЫЙ КАДР (Фикс невидимости)
-            local currentRoot = data.Root
-            if data.BGuiName.Adornee ~= currentRoot then data.BGuiName.Adornee = currentRoot end
-            if data.BGuiDist.Adornee ~= currentRoot then data.BGuiDist.Adornee = currentRoot end
-            if data.Box3DFill.Adornee ~= currentRoot then data.Box3DFill.Adornee = currentRoot end
-            if data.Box3DWire.Adornee ~= currentRoot then data.Box3DWire.Adornee = currentRoot end
-            if data.BGui2D.Adornee ~= currentRoot then data.BGui2D.Adornee = currentRoot end
-
             -- 1. Никнеймы
             data.NameLabel.Visible = showNames
 
-            -- 2. Дистанция
+            -- 2. Дистанция (Всегда снизу ног)
             if showDist and myRoot then
-                local dist = math.round((currentRoot.Position - myRoot.Position).Magnitude)
+                local dist = math.round((data.Root.Position - myRoot.Position).Magnitude)
                 data.DistLabel.Text = dist .. "m"
                 data.DistLabel.Visible = true
             else
                 data.DistLabel.Visible = false
             end
 
-            -- 3. 3D Боксы
+            -- 3. Логика 3D Боксов (Разделение на Обводку и Заливку)
             if show3D then
                 if fillEnabled then
                     data.Box3DWire.Visible = false
@@ -218,7 +220,7 @@ RunService.RenderStepped:Connect(function()
                 data.Box3DWire.Visible = false
             end
 
-            -- 4. 2D Боксы
+            -- 4. Логика 2D Боксов
             if show2D and not show3D then
                 data.BGui2D.Enabled = true
                 if colorChanged then
@@ -234,10 +236,11 @@ RunService.RenderStepped:Connect(function()
                 data.BGui2D.Enabled = false
             end
 
-            -- 5. Полоска здоровья + Выбор стороны
+            -- 5. Полоска здоровья (Исправлено + Выбор стороны)
             if showHealth and show2D and not show3D then
                 local hpPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
                 
+                -- Позиционирование (Влево или Вправо)
                 if hpPosition == "Right" then
                     data.HealthBg.Position = UDim2.new(1, 5, 0, -1)
                     data.HealthFrame.Position = UDim2.new(1, 6, 1 - hpPercent, 0)
@@ -257,9 +260,10 @@ RunService.RenderStepped:Connect(function()
                 data.HealthBg.Visible = false
             end
 
-            -- 6. Снап-линии
+            -- 6. Снап-линии (Snap Lines)
             if showLines and camera then
-                data.SnapLine.Adornee = currentRoot
+                data.SnapLine.Adornee = data.Root
+                -- Линия идет от нижней точки экрана (камеры) до HumanoidRootPart игрока
                 data.SnapLine.Target = camera.CFrame * CFrame.new(0, 0, -1)
                 data.SnapLine.Color3 = config.BoxColor
                 data.SnapLine.Visible = true
@@ -267,7 +271,7 @@ RunService.RenderStepped:Connect(function()
                 data.SnapLine.Visible = false
             end
         else
-            -- Если выключено или игрок мертв
+            -- Выключаем всё, если игрок не подходит под условия
             data.NameLabel.Visible = false
             data.DistLabel.Visible = false
             data.Box3DFill.Visible = false

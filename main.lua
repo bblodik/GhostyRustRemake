@@ -71,9 +71,8 @@ Content.BackgroundTransparency = 1
 local Pages = {}
 local categories = {"AIM", "RENDER", "MISC", "CONFIG"}
 
--- ГЛОБАЛЬНЫЕ НАСТРОЙКИ (Доступны всем внешним модулям)
+-- ГЛОБАЛЬНЫЕ НАСТРОЙКИ
 _G.GhostyConfig = {
-    -- ESP
     EspEnabled = false,
     EspBoxes2D = false,
     EspBoxes3D = false,
@@ -87,7 +86,6 @@ _G.GhostyConfig = {
     FillTransparency = 0.5,
     FillEnabled = false,
     
-    -- CHAMS
     ChamsEnabled = false,
     ChamsFillColor = Color3.fromRGB(45, 140, 255),
     ChamsOutlineColor = Color3.fromRGB(255, 255, 255),
@@ -271,22 +269,33 @@ for id, catName in ipairs(categories) do
     Btn.MouseButton1Click:Connect(function() SwitchTab(catName) end)
 end
 
--- Драггинг
-local dragging, dragInput, dragStart, startPos
+-- =======================================================
+-- ПЕРЕТАСКИВАНИЕ МЫШКОЙ (ИСПРАВЛЕНО!)
+-- =======================================================
+local dragging, dragStart, startPos
 MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true dragStart = input.Position startPos = MainFrame.Position
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then 
+                dragging = false 
+            end
+        end)
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseBehavior and dragging then
+    -- ИСПРАВЛЕНО: Заменено ошибочное Enum.UserInputType.MouseBehavior на MouseMovement
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
         MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Хоткеи Хэндлер
+-- Хоткеи
 local KeyConnection
 KeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
@@ -302,7 +311,7 @@ KeyConnection = UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- ПОДГРУЗКА ВНЕШНИХ МОДУЛЕЙ ИЗ ТВОЕГО GITHUB
+-- ПОДГРУЗКА ВНЕШНИХ МОДУЛЕЙ
 task.spawn(function()
     pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/bblodik/GhostyRustRemake/main/ESP.lua"))()
